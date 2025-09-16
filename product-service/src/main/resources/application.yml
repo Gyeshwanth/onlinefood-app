@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: product-service
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  data:
+    mongodb:
+      uri: mongodb://root:java@mongo:27017/productdb?authSource=admin
+
+server:
+  port: 7410
+
+#aws  access-key  and secret-key
+aws:
+  access-key: ${AWS_ACCESS_KEY}
+  secret-key: ${AWS_SECRET_KEY}
+  region: ap-south-1
+
+file:
+  upload-dir: ${FILE_UPLOAD_DIR}

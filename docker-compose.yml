@@ -1,0 +1,104 @@
+version: '3.9'
+
+
+services:
+  # Infrastructure
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: java
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db  # Persist MongoDB data
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+  # Microservices
+  product-service:
+    image: ${DOCKERHUB_USERNAME}/product-service:latest
+    container_name: product-service
+    ports:
+      - "7410:7410"
+    environment:
+
+      # AWS S3 Configuration
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
+      AWS_S3_REGION: ${AWS_S3_REGION}
+
+      # File upload configuration
+      FILE_UPLOAD_DIR: /app/uploads
+
+    volumes:
+      - product_images:/app/uploads  # Persist uploaded images
+    depends_on:
+      - mongodb
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+# Named volumes for data persistence
+volumes:
+  mongodb_data:
+    driver: local
+  product_images:
+    driver: local
+
+# Network for service communication
+networks:
+  microservices-network:
+    driver: bridge
+
+
+
+#  zookeeper:
+#    image: confluentinc/cp-zookeeper:latest
+#    environment:
+#      ZOOKEEPER_CLIENT_PORT: 2181
+#    ports:
+#      - "2181:2181"
+#
+#  kafka:
+#    image: confluentinc/cp-kafka:latest
+#    depends_on:
+#      - zookeeper
+#    environment:
+#      KAFKA_BROKER_ID: 1
+#      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+#      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+#      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+#    ports:
+#      - "9092:9092"
+
+
+#  postgres:
+#    image: postgres:16
+#    environment:
+#      POSTGRES_USER: ${POSTGRES_USER}
+#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#      POSTGRES_DB: microservices_db
+#    ports:
+#      - "5432:5432"
+
+
+#      - kafka
+
+#  order-service:
+#    image: ${DOCKERHUB_USERNAME}/order-service:latest
+#    ports:
+#      - "8082:8080"
+#    environment:
+#      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/microservices_db
+#      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+#      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+#      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+#      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+#      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+#    depends_on:
+#      - postgres
+#      - kafka
