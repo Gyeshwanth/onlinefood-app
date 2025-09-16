@@ -18,7 +18,7 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  compile:
+  maven-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -29,6 +29,9 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      
+      - name: Fix Maven Wrapper Permissions
+        run: find . -name "mvnw" -exec chmod +x {} \;
       
       - name: Maven Build All Services
         run: |
@@ -60,8 +63,8 @@ jobs:
             if [ -f "$dir/Dockerfile" ]; then
               service_name=${dir%/}
               echo "Building Docker image for $service_name"
-              docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/$service_name:latest $dir
-              docker push ${{ secrets.DOCKERHUB_USERNAME }}/$service_name:latest
+              docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/$service_name:${{ env.IMAGE_TAG }} $dir
+              docker push ${{ secrets.DOCKERHUB_USERNAME }}/$service_name:${{ env.IMAGE_TAG }}
             fi
           done
     
