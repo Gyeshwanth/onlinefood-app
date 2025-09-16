@@ -1,0 +1,72 @@
+name: cicd
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  MONGO_USERNAME: ${{ secrets.MONGO_USERNAME }}
+  MONGO_PASSWORD: ${{ secrets.MONGO_PASSWORD }}
+  POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+  POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+    
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Maven Build All Services
+        run: |
+          for dir in */; do
+            if [ -f "$dir/pom.xml" ]; then
+              echo "Building $dir"
+              cd $dir
+              ./mvnw clean package -DskipTests
+              cd ..
+            fi
+          done
+
+  build_backend_docker_image_and_push:
+    runs-on: ubuntu-latest
+    needs: compile
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4   
+    
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    
+      - name: Build and Push Docker Images
+        run: |
+          for dir in */; do
+            if [ -f "$dir/Dockerfile" ]; then
+              service_name=${dir%/}
+              echo "Building Docker image for $service_name"
+              docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/$service_name:latest $dir
+              docker push ${{ secrets.DOCKERHUB_USERNAME }}/$service_name:latest
+            fi
+          done
+    
+      - name: Start Docker Compose
+        run: |
+          docker-compose down || true
+          docker-compose pull
+          docker-compose up -d
