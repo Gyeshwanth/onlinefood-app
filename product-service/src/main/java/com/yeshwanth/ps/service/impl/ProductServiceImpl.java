@@ -33,7 +33,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
 
-    private final S3Client s3Client;
+ //   private final S3Client s3Client;
     private final ProductMapper productMapper;
     private final ProductRepository productRepository;
 
