@@ -37,8 +37,8 @@ public class ProductServiceImpl implements ProductService {
     private final ProductMapper productMapper;
     private final ProductRepository productRepository;
 
-    @Value("${aws.s3.bucket.name}")
-    private String bucketName;
+    // @Value("${aws.s3.bucket.name}")
+    // private String bucketName;
 
     @Value("${server.port}")
     private String serverPort;
@@ -46,8 +46,8 @@ public class ProductServiceImpl implements ProductService {
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
 
-    @Value("${aws.s3.region}")
-    private String awsRegion;
+    // @Value("${aws.s3.region}")
+    // private String awsRegion;
 
     // File validation constants
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
