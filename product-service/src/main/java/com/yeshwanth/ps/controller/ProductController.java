@@ -18,7 +18,7 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping("/add")
-    public ResponseEntity<?> addProduct(@Valid @RequestBody ProductRequest product, @RequestPart  MultipartFile file) {
+    public ResponseEntity<?> addProduct(@Valid @RequestPart("product") ProductRequest product, @RequestPart  MultipartFile file) {
         ProductResponse productResponse = productService.addProduct(product, file);
         return new ResponseEntity<>(productResponse, HttpStatus.CREATED);
     }
