@@ -58,44 +58,44 @@ public class ProductServiceImpl implements ProductService {
             "jpg", "jpeg", "png"
     );
 
-    @Override
-    public String uploadFile(MultipartFile file) {
-        log.info("Starting S3 file upload for file: {}", file.getOriginalFilename());
+    // @Override
+    // public String uploadFile(MultipartFile file) {
+    //     log.info("Starting S3 file upload for file: {}", file.getOriginalFilename());
 
-        // Validate file
-        validateFile(file);
+    //     // Validate file
+    //     validateFile(file);
 
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || originalFilename.trim().isEmpty()) {
-            throw new InvalidFileException("Invalid filename");
-        }
+    //     String originalFilename = file.getOriginalFilename();
+    //     if (originalFilename == null || originalFilename.trim().isEmpty()) {
+    //         throw new InvalidFileException("Invalid filename");
+    //     }
 
-        String fileExtension = getFileExtension(originalFilename);
-        String key = UUID.randomUUID().toString() + "." + fileExtension;
+    //     String fileExtension = getFileExtension(originalFilename);
+    //     String key = UUID.randomUUID().toString() + "." + fileExtension;
 
-        try {
-            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(bucketName)
-                    .key(key)
-                    .contentType(file.getContentType())
-                    .contentLength(file.getSize())
-                    .build();
+    //     try {
+    //         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+    //                 .bucket(bucketName)
+    //                 .key(key)
+    //                 .contentType(file.getContentType())
+    //                 .contentLength(file.getSize())
+    //                 .build();
 
-            PutObjectResponse response = s3Client.putObject(putObjectRequest,
-                    RequestBody.fromBytes(file.getBytes()));
+    //         PutObjectResponse response = s3Client.putObject(putObjectRequest,
+    //                 RequestBody.fromBytes(file.getBytes()));
 
-            if (response.sdkHttpResponse().isSuccessful()) {
-                String s3Url = String.format("https://%s.s3.%s.amazonaws.com/%s",
-                        bucketName, awsRegion, key);
-                log.info("Successfully uploaded file to S3: {}", s3Url);
-                return s3Url;
-            }
-        } catch (IOException ex) {
-            log.error("S3 file upload failed", ex);
-            throw new FileUploadException("S3 file upload failed: " + ex.getMessage());
-        }
-        throw new FileUploadException("An error occurred while uploading the file to S3");
-    }
+    //         if (response.sdkHttpResponse().isSuccessful()) {
+    //             String s3Url = String.format("https://%s.s3.%s.amazonaws.com/%s",
+    //                     bucketName, awsRegion, key);
+    //             log.info("Successfully uploaded file to S3: {}", s3Url);
+    //             return s3Url;
+    //         }
+    //     } catch (IOException ex) {
+    //         log.error("S3 file upload failed", ex);
+    //         throw new FileUploadException("S3 file upload failed: " + ex.getMessage());
+    //     }
+    //     throw new FileUploadException("An error occurred while uploading the file to S3");
+    // }
 
     @Override
     public String uploadFileLocal(MultipartFile file) {
