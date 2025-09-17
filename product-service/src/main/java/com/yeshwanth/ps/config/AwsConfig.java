@@ -10,17 +10,16 @@ import software.amazon.awssdk.services.s3.S3Client;
 
 @Configuration
 public class AwsConfig {
-
-    @Value("${aws.s3.bucket.name}")
-    private String bucketName;
+    
     @Value("${aws.region}")
     private String region;
-    @Value("${aws.access-key:}")
+    @Value("${aws.access-key}")
     private String accessKeyId;
-    @Value("${aws.secret-key:}")
+    @Value("${aws.secret-key}")
     private String secretAccessKey;
 
     @Bean
+    @ConditionalOnProperty(name = "aws.access-key")
     public S3Client s3Client() {
         return S3Client.builder()
                 .region(Region.of(region))

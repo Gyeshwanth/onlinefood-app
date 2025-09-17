@@ -20,3 +20,9 @@ aws:
 
 file:
   upload-dir: ${FILE_UPLOAD_DIR}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
