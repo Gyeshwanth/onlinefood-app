@@ -7,7 +7,7 @@ spring:
       max-request-size: 10MB
   data:
     mongodb:
-      uri: mongodb://root:java@mongo:27017/productdb?authSource=admin
+      uri: mongodb://root:java@mongodb:27017/productdb?authSource=admin
 
 server:
   port: 7410
@@ -19,7 +19,7 @@ aws:
   region: ap-south-1
 
 file:
-  upload-dir: ${FILE_UPLOAD_DIR}
+  upload-dir: ${FILE_UPLOAD_DIR:/app/uploads}
 
 management:
   endpoints:
