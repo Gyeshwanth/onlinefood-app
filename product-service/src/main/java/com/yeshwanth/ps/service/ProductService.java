@@ -6,7 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface ProductService {
 
-    String uploadFile(MultipartFile file);
+  //  String uploadFile(MultipartFile file);
 
     ProductResponse addProduct(ProductRequest productRequest,MultipartFile file);
 
