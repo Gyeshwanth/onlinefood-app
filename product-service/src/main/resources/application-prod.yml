@@ -1,28 +1,24 @@
 spring:
   application:
     name: product-service
-  config:
-    import: optional:configserver:http://localhost:1000
-  cloud:
-    bus:
-      enabled: true
-  kafka:
-    bootstrap-servers: localhost:9092
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
   data:
     mongodb:
-      uri: mongodb://root:java@localhost:27017/productdb?authSource=admin
+      uri: mongodb://root:java@mongodb:27017/productdb?authSource=admin
 
 server:
   port: 7410
 
+#aws  access-key  and secret-key
 aws:
   access-key: ${AWS_ACCESS_KEY}
   secret-key: ${AWS_SECRET_KEY}
   region: ap-south-1
+
+
 
 management:
   endpoints:
@@ -30,7 +26,17 @@ management:
       exposure:
         include: '*'
 
+  config:
+    import: optional:configserver:http://localhost:1000
+  cloud:
+    bus:
+      enabled: true  # Enable Spring Cloud Bus
+  kafka:
+    bootstrap-servers: kafka:29092
+
 eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+
+

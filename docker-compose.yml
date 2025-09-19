@@ -1,21 +1,97 @@
-
 services:
-  # Infrastructure
+  # Infrastructure Services
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Kafka UI
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      DYNAMIC_CONFIG_ENABLED: true
+    ports:
+      - "8080:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
   mongodb:
     image: mongo:latest
     container_name: mongodb
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: java
+      MONGO_INITDB_DATABASE: productdb
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db  # Persist MongoDB data
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
     networks:
       - microservices-network
     restart: unless-stopped
- 
- # MongoDB UI
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB UI
   mongo-express:
     image: mongo-express:latest
     container_name: mongo-express
@@ -25,16 +101,62 @@ services:
       ME_CONFIG_MONGODB_URL: mongodb://root:java@mongodb:27017/
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: admin123
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: true
     ports:
       - "8081:8081"
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     networks:
       - microservices-network
     restart: unless-stopped
-    
-    
-    
+
+  # Service Discovery
+  eureka-server:
+    image: yeshwanthgosi/eureka-server:latest
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8761/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Configuration Server
+  config-server:
+    image: yeshwanthgosi/config-server:latest
+    container_name: config-server
+    ports:
+      - "1000:1000"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - GITHUB_USERNAME=${GITHUB_USERNAME}
+      - GITHUB_PASSWORD=${GITHUB_PASSWORD}
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:1000/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   # Microservices
   product-service:
     image: yeshwanthgosi/product-service:latest
@@ -42,74 +164,44 @@ services:
     ports:
       - "7410:7410"
     environment:
-
-      # AWS S3 Configuration
-    #  AWS_ACCESS_KEY_ID: abcd1234567890secretkey
-     # AWS_SECRET_ACCESS_KEY: AKIA1234567890EXAMPLE
-    #  AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
-   #   AWS_S3_REGION: ${AWS_S3_REGION}
-
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:1000
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_DATA_MONGODB_URI=mongodb://root:java@mongodb:27017/productdb?authSource=admin
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY:-}
+      - AWS_SECRET_KEY=${AWS_SECRET_KEY:-}
+      - JAVA_OPTS=-Xmx1g -Xms512m
     depends_on:
-      - mongodb
+      config-server:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
       - microservices-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7410/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 # Named volumes for data persistence
 volumes:
   mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  kafka_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
     driver: local
 
 # Network for service communication
 networks:
   microservices-network:
     driver: bridge
-
-
-
-#  zookeeper:
-#    image: confluentinc/cp-zookeeper:latest
-#    environment:
-#      ZOOKEEPER_CLIENT_PORT: 2181
-#    ports:
-#      - "2181:2181"
-#
-#  kafka:
-#    image: confluentinc/cp-kafka:latest
-#    depends_on:
-#      - zookeeper
-#    environment:
-#      KAFKA_BROKER_ID: 1
-#      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-#      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-#      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-#    ports:
-#      - "9092:9092"
-
-
-#  postgres:
-#    image: postgres:16
-#    environment:
-#      POSTGRES_USER: ${POSTGRES_USER}
-#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-#      POSTGRES_DB: microservices_db
-#    ports:
-#      - "5432:5432"
-
-
-#      - kafka
-
-#  order-service:
-#    image: ${DOCKERHUB_USERNAME}/order-service:${IMAGE_TAG}
-#    ports:
-#      - "8082:8080"
-#    environment:
-#      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/microservices_db
-#      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-#      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-#      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
-#      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-#      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-#    depends_on:
-#      - postgres
-#      - kafka

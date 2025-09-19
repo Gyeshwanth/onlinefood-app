@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/Gyeshwanth/onlinefood-prop.git
+          clone-on-start: true
+          username: ${GITHUB_USERNAME}
+          password: ${GITHUB_PASSWORD}
+          label: main
+    bus:
+      enabled: true
+  kafka:
+    bootstrap-servers: localhost:9092
+
+server:
+  port: 1000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
