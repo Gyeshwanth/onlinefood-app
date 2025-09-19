@@ -6,6 +6,7 @@ import com.yeshwanth.ps.dto.mapper.ProductMapper;
 import com.yeshwanth.ps.entity.Product;
 import com.yeshwanth.ps.exception.FileUploadException;
 import com.yeshwanth.ps.exception.InvalidFileException;
+import com.yeshwanth.ps.exception.ProductNotFoundException;
 import com.yeshwanth.ps.repository.ProductRepository;
 import com.yeshwanth.ps.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -18,13 +19,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -33,21 +34,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
 
- //   private final S3Client s3Client;
+     private final S3Client s3Client;
     private final ProductMapper productMapper;
     private final ProductRepository productRepository;
 
-    // @Value("${aws.s3.bucket.name}")
-    // private String bucketName;
+     @Value("${aws.s3.bucket.name}")
+     private String bucketName;
 
-    @Value("${server.port}")
-    private String serverPort;
-
-    @Value("${file.upload-dir:uploads}")
-    private String uploadDir;
-
-    // @Value("${aws.s3.region}")
-    // private String awsRegion;
+     @Value("${aws.s3.region}")
+     private String awsRegion;
 
     // File validation constants
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -58,82 +53,64 @@ public class ProductServiceImpl implements ProductService {
             "jpg", "jpeg", "png"
     );
 
-    // @Override
-    // public String uploadFile(MultipartFile file) {
-    //     log.info("Starting S3 file upload for file: {}", file.getOriginalFilename());
+     @Override
+     public String uploadFile(MultipartFile file) {
+         log.info("Starting S3 file upload for file: {}", file.getOriginalFilename());
 
-    //     // Validate file
-    //     validateFile(file);
+         // Validate file
+         validateFile(file);
 
-    //     String originalFilename = file.getOriginalFilename();
-    //     if (originalFilename == null || originalFilename.trim().isEmpty()) {
-    //         throw new InvalidFileException("Invalid filename");
-    //     }
+         String originalFilename = file.getOriginalFilename();
+         if (originalFilename == null || originalFilename.trim().isEmpty()) {
+             throw new InvalidFileException("Invalid filename");
+         }
 
-    //     String fileExtension = getFileExtension(originalFilename);
-    //     String key = UUID.randomUUID().toString() + "." + fileExtension;
+         String fileExtension = getFileExtension(originalFilename);
+         String key = UUID.randomUUID().toString() + "." + fileExtension;
 
-    //     try {
-    //         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-    //                 .bucket(bucketName)
-    //                 .key(key)
-    //                 .contentType(file.getContentType())
-    //                 .contentLength(file.getSize())
-    //                 .build();
+         try {
+             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                     .bucket(bucketName)
+                     .key(key)
+                     .contentType(file.getContentType())
+                     .contentLength(file.getSize())
+                     .build();
 
-    //         PutObjectResponse response = s3Client.putObject(putObjectRequest,
-    //                 RequestBody.fromBytes(file.getBytes()));
+             PutObjectResponse response = s3Client.putObject(putObjectRequest,
+                     RequestBody.fromBytes(file.getBytes()));
 
-    //         if (response.sdkHttpResponse().isSuccessful()) {
-    //             String s3Url = String.format("https://%s.s3.%s.amazonaws.com/%s",
-    //                     bucketName, awsRegion, key);
-    //             log.info("Successfully uploaded file to S3: {}", s3Url);
-    //             return s3Url;
-    //         }
-    //     } catch (IOException ex) {
-    //         log.error("S3 file upload failed", ex);
-    //         throw new FileUploadException("S3 file upload failed: " + ex.getMessage());
-    //     }
-    //     throw new FileUploadException("An error occurred while uploading the file to S3");
-    // }
+             if (response.sdkHttpResponse().isSuccessful()) {
+                 String s3Url = String.format("https://%s.s3.%s.amazonaws.com/%s",
+                         bucketName, awsRegion, key);
+                 log.info("Successfully uploaded file to S3: {}", s3Url);
+                 return s3Url;
+             }
+         } catch (IOException ex) {
+             log.error("S3 file upload failed", ex);
+             throw new FileUploadException("S3 file upload failed: " + ex.getMessage());
+         }
+         throw new FileUploadException("An error occurred while uploading the file to S3");
+     }
 
     @Override
-    public String uploadFileLocal(MultipartFile file) {
-        log.info("Starting local file upload for file: {}", file.getOriginalFilename());
+    public Boolean deleteFile(String fileName) {
 
-        // Validate file
-        validateFile(file);
-
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || originalFilename.trim().isEmpty()) {
-            throw new InvalidFileException("Invalid filename");
-        }
-
-        String extension = getFileExtension(originalFilename);
-        String fileName = UUID.randomUUID().toString() + "." + extension;
+        DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                .bucket(bucketName)
+                .key(fileName)
+                .build();
 
         try {
-            // Create upload directory if it doesn't exist
-            Path uploadPath = Paths.get(uploadDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-                log.info("Created upload directory: {}", uploadPath.toAbsolutePath());
-            }
-
-            // Save file outside JAR
-            Path filePath = uploadPath.resolve(fileName);
-            file.transferTo(filePath.toFile());
-
-            // Build proper URL with port
-            String fileUrl = String.format("http://localhost:%s/images/%s", serverPort, fileName);
-            log.info("Successfully uploaded file locally: {}", fileUrl);
-            return fileUrl;
-
-        } catch (IOException e) {
-            log.error("Local file upload failed", e);
-            throw new FileUploadException("Local file upload failed: " + e.getMessage());
+            s3Client.deleteObject(deleteObjectRequest);
+            log.info("Successfully deleted file from S3: {}", fileName);
+            return true;
+        } catch (Exception ex) {
+            log.error("Failed to delete file from S3: {}", fileName, ex);
+            return false;
         }
+
     }
+
 
     @Override
     @Transactional
@@ -145,13 +122,51 @@ public class ProductServiceImpl implements ProductService {
 
         // Upload image if provided
         if (file != null && !file.isEmpty()) {
-            String imageUrl = uploadFileLocal(file); // Use local for development
+            String imageUrl = uploadFile(file);
             product.setImageUrl(imageUrl);
         }
 
         Product savedProduct = productRepository.save(product);
         log.info("Successfully added product with id: {}", savedProduct.getId());
         return productMapper.entityToDto(savedProduct);
+    }
+
+    @Override
+    public ProductResponse getProductById(String id) {
+        return productRepository.findById(id)
+                .map(productMapper::entityToDto)
+                .orElseThrow(() -> {
+                    log.error("Product not found with id: {}", id);
+                    return new ProductNotFoundException("Product not found with id: " + id);
+                });
+    }
+
+    @Override
+    public List<ProductResponse> getProducts() {
+
+        return productRepository.findAll()
+                .stream()
+                .map(productMapper::entityToDto)
+                .toList();
+    }
+
+    @Override
+    public void deleteProductById(String id) {
+
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("Product not found with id: {}", id);
+                    return new ProductNotFoundException("Product not found with id: " + id);
+                });
+        String imageUrl = product.getImageUrl();
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            String fileName = imageUrl.substring(imageUrl.lastIndexOf("/") + 1);
+            boolean deleted = deleteFile(fileName);
+            if (deleted) {
+                productRepository.deleteById(product.getId());
+                log.info("Successfully deleted product with id: {}", id);
+            }
+        }
     }
 
     // Private validation methods

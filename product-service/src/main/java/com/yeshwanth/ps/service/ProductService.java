@@ -4,14 +4,20 @@ import com.yeshwanth.ps.dto.ProductRequest;
 import com.yeshwanth.ps.dto.ProductResponse;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 public interface ProductService {
 
-  //  String uploadFile(MultipartFile file);
+    String uploadFile(MultipartFile file);
+
+    Boolean deleteFile(String fileName);
 
     ProductResponse addProduct(ProductRequest productRequest,MultipartFile file);
 
+   ProductResponse getProductById(String id);
 
-    //for production i use this s3 bucket for images for local save images folder under resources/static/images and given url r path in imageurl and save db
-     String uploadFileLocal(MultipartFile file);
+   List<ProductResponse> getProducts();
+
+    void deleteProductById(String id);
 
 }

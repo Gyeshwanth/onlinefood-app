@@ -8,7 +8,6 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -43,19 +42,7 @@ public class GlobalExceptionHandler {
     }
 
 
-//    @ExceptionHandler(ResponseStatusException.class)
-//    public ResponseEntity<ErrorResponse> handle(ResponseStatusException exp) {
-//        log.error("ResponseStatusException occurred: {}", exp.getReason(), exp);
-//
-//        // Create error response for ResponseStatusException
-//        ErrorResponse errorResponse = ErrorResponse.builder()
-//                .timestamp(LocalDateTime.now())
-//                .status(exp.getStatusCode().value())
-//                .error(exp.getStatusCode().toString())
-//                .message(exp.getReason() != null ? exp.getReason() : "An error occurred")
-//                .build();
-//        return new ResponseEntity<>(errorResponse, exp.getStatusCode());
-//    }
+
 
     @ExceptionHandler(FileUploadException.class)
     public ResponseEntity<ErrorResponse> handle(FileUploadException exp) {
@@ -84,4 +71,20 @@ public class GlobalExceptionHandler {
 
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
+
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handle(ProductNotFoundException exp) {
+        log.error("Product not found exception occurred", exp);
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Product Not Found")
+                .message(exp.getMessage())
+                .build();
+
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+    }
+
+
 }
